@@ -1,0 +1,266 @@
+---
+title: "Homework 3"
+author: "Ethan Buck"
+date: "February 23, 2019"
+output: html_document
+---
+
+```{r}
+# Including necessary packages
+library(ISLR)  # Auto data set in ISLR
+library(MASS)  # lda, qda in MASS
+```
+
+```{r}
+xTrain = c(-3, -2, 0, 1, -1, 2, 3, 4, 5)
+yTrain = factor(c(-1, -1, -1, -1, 1, 1, 1, 1, 1))
+```
+
+## Fitting LDA and QDA Models
+We will now fit the LDA and QDA models on this training data.
+
+The parameters needed to fit the LDA model (with a single covariate) are:
+    $\hat{\mu}_c$'s, $\hat{\sigma}$, and $\hat{\pi}_c$
+    This is $(k-1)(p+1)$ parameters, where $k$ is the number of classes, and $p$ is the number of covariates.  In our case, this is $(1)(2) = 2$ parameters.
+    
+The parameters needed to fit the QDA model (with a single covariate) are:
+    $\hat{\mu}_c$'s, $\hat{\sigma}_c$'s, and $\hat{\pi}_c$
+    This is $(k-1)(\frac{p(p+3)}{2}+1)$ parameters, where $k$ is the number of classes, and $p$ is the number of covariates.  In our case, this is $(1)(3) = 3$ parameters.
+    
+The discriminant function for the LDA model (with $p = 1$) is
+$$\delta_c(x_0) = \frac{x_0\mu_c}{\sigma^2} - \frac{\mu_c^2}{2\sigma^2} + \log(\pi_c)$$
+
+For the QDA model, the discriminant function (with $p = 1$) is
+$$\delta_c(x_0) = -\log(\sigma_c) - \frac{(x_0 - \mu_c)^2}{2\sigma_c^2} + \log(\pi_c)$$
+
+```{r}
+# Fit models
+ldaModel <- lda(yTrain ~ xTrain)
+qdaModel <- qda(yTrain ~ xTrain)
+```
+We can get the summaries for these models
+```{r}
+# Get summary
+summary(ldaModel)
+summary(qdaModel)
+```
+
+```{r}
+# Make predictions on training data
+ldaPred <- predict(ldaModel)$class
+qdaPred <- predict(qdaModel)$class
+```
+
+```{r}
+# Get performance by looking at confusion matrix
+library(caret)
+cat("LDA Confusion Matrix: \n")
+ldaConf = confusionMatrix(data=ldaPred, reference=yTrain)
+ldaConf$table
+cat("\nQDA Confusion Matrix:  \n")
+qdaConf = confusionMatrix(data=qdaPred, reference=yTrain)
+qdaConf$table
+```
+
+```{r}
+ldaMets = ldaConf$overall
+ldaAcc = ldaMets["Accuracy"]
+ldaErr = 1-ldaAcc
+names(ldaErr) = "LDA Training Error"
+ldaErr
+
+qdaMets = qdaConf$overall
+qdaAcc = qdaMets["Accuracy"]
+qdaErr = 1-qdaAcc
+names(qdaErr) = "QDA Training Error"
+qdaErr
+```
+
+```{r}
+xTest <- c(-1.5, -1, 0, 1, 0.5, 1, 2.5, 5)
+yTest <- factor(c(-1, -1, -1, -1, 1, 1, 1, 1))
+```
+
+```{r}
+# Fitting, predicting, and confusion matrix function
+daFunction <- function(family, Train, Test) {
+  if (family == "lda") {
+    model1 <- lda(y ~ x, data = Train)
+  }
+  else if (family == "qda") {
+    model1 <- qda(y ~ x, data = Train)
+  }
+  else return("Error, invalid family!")
+  preds <- predict(model1, newdata = Test)$class
+  print(preds)
+  cat("\n")
+  Confus <- confusionMatrix(data = preds, reference = Test$y)
+  print(Confus$table)
+  cat("\n")
+  
+  Mets = Confus$overall
+  Acc = Mets["Accuracy"]
+  Err = 1 - Acc
+  names(Err) = "Test Error"
+  print(Err)
+  
+  print(ggplot(Test, aes(y = y, x = x, fill = preds)) + geom_tile() + geom_point())
+}
+```
+
+```{r}
+TrainingData <- data.frame(x = xTrain, y = yTrain)
+TestData <- data.frame(x = xTest, y = yTest)
+daFunction("lda", TrainingData, TestData)
+```
+
+```{r}
+daFunction("qda", TrainingData, TestData)
+```
+```{r}
+```
+
+
+## Problem 2
+
+```{r}
+# Check out data
+head(Auto)
+mpg01 <- as.integer(Auto$mpg > median(Auto$mpg))
+autoFrame <- cbind(mpg01, Auto)
+print(median(Auto$mpg))
+head(autoFrame)
+```
+
+```{r}
+#library('reshape')
+#newDf <- melt(autoFrame, id.vars = c(""))
+#head(newDf)
+
+plots_mpg01 <- function(colName) {
+
+allCounts <- table(autoFrame[,colName])
+posCounts <- rep(0, length(allCounts))
+negCounts <- rep(0, length(allCounts))
+index = 1
+
+for (val in as.numeric(names(allCounts))) {
+  posCounts[index] <- sum(autoFrame[which(autoFrame[,colName] == val),"mpg01"])
+  negCounts[index] <- allCounts[index] - posCounts[index]
+  index = index + 1
+}
+data.m <- data.frame(uniques = names(allCounts), One = posCounts, Zero = negCounts)
+head(data.m)
+library(reshape)
+data.m2 <- melt(data.m, id.vars = "uniques")
+data.m2
+
+print(ggplot(data.m2, aes(uniques, value)) +   
+  geom_bar(aes(fill = variable), position = "dodge", stat="identity") + theme(axis.text.x = element_text(angle = 90, hjust = 1)))
+
+}
+
+plots_mpg01("cylinders")
+plots_mpg01("year")
+plots_mpg01("origin")
+# Horsepower, displacement, weight, acceleration continuous
+ggplot(autoFrame, aes(x = displacement, y = mpg01)) + geom_point()
+ggplot(autoFrame, aes(x = weight, y = mpg01)) + geom_point()
+ggplot(autoFrame, aes(x = acceleration, y = mpg01)) + geom_point()
+ggplot(autoFrame, aes(x = horsepower, y = mpg01)) + geom_point()
+```
+
+These bar charts are shown to look at the categorical data, and how it may be correlated with the variable mpg01.  It shows that the number of cylinders appears to be a very significant factor that could help predict mpg01.  However, we note that in LDA and QDA, we cannot use categorical predictors, as they assume a multivariate normal distribution for the predictors.
+
+Acceleration does not really show strong signs of correlation, but acceleration shows some signs that it may be an insightful predictor, as well as the weight.  Large weights seem to indicate 0 values for mpg01, and lower displacement appears to indicate 1 values for mpg01 (though we note this relationship is not quite as strong, since there are a considerable amount of 0 values with lower than average displacement values).
+
+Horsepower also seems to be a significant factor, with higher horsepowers indicating 0 values for mpg01.
+
+```{r}
+# Change appropriate columns to factors
+autoFrame$cylinders <- factor(autoFrame$cylinders)
+autoFrame$year <- factor(autoFrame$year)
+autoFrame$origin <- factor(autoFrame$origin)
+str(autoFrame)
+```
+
+```{r}
+# Switch mpg01 to factor
+autoFrame$mpg01 <- factor(autoFrame$mpg01)
+# Train test split
+trainProp <- 0.8
+
+randomIndexes <- sample(1:nrow(autoFrame))
+trainIndex <- randomIndexes[1:floor(length(randomIndexes)*trainProp)]
+testIndex <- setdiff(randomIndexes, trainIndex)
+
+trainAuto <- autoFrame[trainIndex, ]
+testAuto <- autoFrame[testIndex, ]
+```
+
+```{r}
+autoDAFunction <- function(family, Train, Test, fmla, y) {
+  if (family == "lda") {
+    model1 <- lda(fmla, data = Train)
+  }
+  else if (family == "qda") {
+    model1 <- qda(fmla, data = Train)
+  }
+  else return("Error, invalid family!")
+  preds <- predict(model1, newdata = Test)$class
+  print(preds)
+  cat("\n")
+  Confus <- confusionMatrix(data = preds, reference = Test[,y])
+  print(Confus$table)
+  cat("\n")
+  
+  Mets = Confus$overall
+  print(Mets)
+  Acc = Mets["Accuracy"]
+  Err = 1 - Acc
+  names(Err) = "Test Error"
+  print(Err)
+  return(list(model1, preds, Confus, Err))
+  #print(ggplot(Test, aes(y = y, x = x, fill = preds)) + geom_tile() + geom_point())
+}
+ldaAuto <- autoDAFunction("lda", trainAuto, testAuto, as.formula("mpg01 ~ weight+displacement + horsepower"), "mpg01")
+qdaAuto <- autoDAFunction("qda", trainAuto, testAuto, as.formula("mpg01 ~ weight+displacement + horsepower"), "mpg01")
+```
+
+```{r}
+# Logistic Regression
+
+log_mod = glm(mpg01 ~ weight + displacement + horsepower, data=trainAuto, family = 'binomial')
+test_pred = factor( (predict(log_mod, newdata=testAuto, type="response") > .5) * 1)
+test_err = mean(test_pred != testAuto$mpg01)
+test_err
+
+
+```
+
+```{r}
+# KNN with several K
+library(class)
+testErrs <- rep(0, 19)
+for (kVal in 2:20) {
+  #print(kVal)
+  pred = knn(train = trainAuto[,c("weight", "displacement", "horsepower")], test = testAuto[,c("weight", "displacement", "horsepower")], cl=trainAuto[,"mpg01"], k=kVal)
+  #head(pred)
+  cmtx = confusionMatrix(data=pred,reference=testAuto[,"mpg01"])
+  #print(cmtx$table)
+  mets = cmtx$overall
+  acc = mets["Accuracy"]
+  err = 1-acc
+  names(err) = "Test Error"
+  #print(err)
+  testErrs[kVal-1] <- err
+  #cat("\n\n")
+
+}
+TestErrData <- data.frame(KValues = 2:20, TestError = testErrs)
+print(TestErrData)
+ggplot(TestErrData, aes(x = KValues, y = TestError)) + geom_line() +
+  scale_y_continuous(limits = c(0, 0.2)) + labs(title = "Test Error vs K Values", x= "K Values", y = "Test Error") + scale_x_continuous(limits = c(2, 20))
+# Create a plot:  x axis -> K value, y axis -> test error
+```
+
