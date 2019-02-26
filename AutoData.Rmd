@@ -1,7 +1,7 @@
 ---
-title: "Homework 3"
+title: "Homework 3 - Data Mining"
 author: "Ethan Buck"
-date: "February 23, 2019"
+date: "February 28, 2019"
 output: html_document
 ---
 
@@ -9,11 +9,15 @@ output: html_document
 # Including necessary packages
 library(ISLR)  # Auto data set in ISLR
 library(MASS)  # lda, qda in MASS
+library(ggplot2)  # Plotting
+library(gridExtra)  # Place ggplots side by side
+set.seed(3)
 ```
 
 ```{r}
 xTrain = c(-3, -2, 0, 1, -1, 2, 3, 4, 5)
 yTrain = factor(c(-1, -1, -1, -1, 1, 1, 1, 1, 1))
+print(yTrain)
 ```
 
 ## Fitting LDA and QDA Models
@@ -38,12 +42,34 @@ $$\delta_c(x_0) = -\log(\sigma_c) - \frac{(x_0 - \mu_c)^2}{2\sigma_c^2} + \log(\
 ldaModel <- lda(yTrain ~ xTrain)
 qdaModel <- qda(yTrain ~ xTrain)
 ```
-We can get the summaries for these models
+We can get the estimates of the parameters for these models.
 ```{r}
 # Get summary
-summary(ldaModel)
-summary(qdaModel)
+# mu hats
+ldaModel$means
+# sigma hat ^2 - pooled variance
+(3*var(xTrain[1:4]) + 4*var(xTrain[5:9])) / (4+5-2)
+# pi hat
+ldaModel$prior
+cat("\n")
+# mu hats
+qdaModel$means
+# sigma hat
+#qdaModel$scaling   #??
+var(xTrain[1:4])  # var for -1 class
+sqrt(var(xTrain[1:4]))  # stdDev for -1 class
+var(xTrain[5:9])  # var for 1 class
+sqrt(var(xTrain[5:9]))  # stdDev for -1 class
+# pi hat
+qdaModel$prior
 ```
+
+Thus, the discriminant functions for the LDA model are
+$$\delta_1(x_0) = \frac{2.6x_0}{4.457} - \frac{2.6^2}{2*4.457} + \log(0.55556)$$
+$$\delta_{-1}(x_0) = \frac{-x_0}{4.457} - \frac{1}{2*4.457} + \log(0.44444)$$
+and the discriminant functions for the QDA model are
+$$\delta_1(x_0) = -\log(2.302) - \frac{(x_0 - 2.6)^2}{2*5.3} + \log(0.55556)$$
+$$\delta_{-1}(x_0) = -\log(1.826) - \frac{(x_0 + 1)^2}{2*5.3} + \log(0.44444)$$
 
 ```{r}
 # Make predictions on training data
@@ -117,9 +143,8 @@ daFunction("lda", TrainingData, TestData)
 ```{r}
 daFunction("qda", TrainingData, TestData)
 ```
-```{r}
-```
 
+Thus, since the test error is the same for both, we would lean towards using the LDA model due to the hierarchy principle.  Additionally, since there is only one predictor variable, there really is no need to use the QDA model ever over the LDA model, since the relaxed assumption of the covariate matrix is not needed due to the constraint of only one covariate.  Our parameter estimates before showed that the variances are reasonably close considering the small sample size.  Additionally, you can really only have a linear boundary when there is one covariate, as it is just a cutoff at certain x values.
 
 ## Problem 2
 
@@ -164,10 +189,18 @@ plots_mpg01("cylinders")
 plots_mpg01("year")
 plots_mpg01("origin")
 # Horsepower, displacement, weight, acceleration continuous
-ggplot(autoFrame, aes(x = displacement, y = mpg01)) + geom_point()
-ggplot(autoFrame, aes(x = weight, y = mpg01)) + geom_point()
-ggplot(autoFrame, aes(x = acceleration, y = mpg01)) + geom_point()
-ggplot(autoFrame, aes(x = horsepower, y = mpg01)) + geom_point()
+p1 <- ggplot(autoFrame, aes(x = displacement, y = mpg01)) + geom_point()
+p2 <- ggplot(autoFrame, aes(y = displacement, x = mpg01, group = mpg01)) + geom_boxplot()
+grid.arrange(p1, p2, ncol = 2)
+p1 <- ggplot(autoFrame, aes(x = weight, y = mpg01)) + geom_point()
+p2 <- ggplot(autoFrame, aes(y = weight, x = mpg01, group = mpg01)) + geom_boxplot()
+grid.arrange(p1, p2, ncol = 2)
+p1 <- ggplot(autoFrame, aes(x = acceleration, y = mpg01)) + geom_point()
+p2 <- ggplot(autoFrame, aes(y = acceleration, x = mpg01, group = mpg01)) + geom_boxplot()
+grid.arrange(p1, p2, ncol = 2)
+p1 <- ggplot(autoFrame, aes(x = horsepower, y = mpg01)) + geom_point()
+p2 <- ggplot(autoFrame, aes(y = horsepower, x = mpg01, group = mpg01)) + geom_boxplot()
+grid.arrange(p1, p2, ncol = 2)
 ```
 
 These bar charts are shown to look at the categorical data, and how it may be correlated with the variable mpg01.  It shows that the number of cylinders appears to be a very significant factor that could help predict mpg01.  However, we note that in LDA and QDA, we cannot use categorical predictors, as they assume a multivariate normal distribution for the predictors.
@@ -259,6 +292,7 @@ for (kVal in 2:20) {
 }
 TestErrData <- data.frame(KValues = 2:20, TestError = testErrs)
 print(TestErrData)
+print(TestErrData[which(TestErrData$TestError == min(TestErrData$TestError)),])
 ggplot(TestErrData, aes(x = KValues, y = TestError)) + geom_line() +
   scale_y_continuous(limits = c(0, 0.2)) + labs(title = "Test Error vs K Values", x= "K Values", y = "Test Error") + scale_x_continuous(limits = c(2, 20))
 # Create a plot:  x axis -> K value, y axis -> test error
