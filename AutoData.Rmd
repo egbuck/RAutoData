@@ -11,6 +11,7 @@ library(ISLR)  # Auto data set in ISLR
 library(MASS)  # lda, qda in MASS
 library(ggplot2)  # Plotting
 library(gridExtra)  # Place ggplots side by side
+library(caret)   # Confusion Matrix
 set.seed(3)
 ```
 
@@ -55,11 +56,10 @@ cat("\n")
 # mu hats
 qdaModel$means
 # sigma hat
-#qdaModel$scaling   #??
 var(xTrain[1:4])  # var for -1 class
 sqrt(var(xTrain[1:4]))  # stdDev for -1 class
 var(xTrain[5:9])  # var for 1 class
-sqrt(var(xTrain[5:9]))  # stdDev for -1 class
+sqrt(var(xTrain[5:9]))  # stdDev for 1 class
 # pi hat
 qdaModel$prior
 ```
@@ -69,7 +69,7 @@ $$\delta_1(x_0) = \frac{2.6x_0}{4.457} - \frac{2.6^2}{2*4.457} + \log(0.55556)$$
 $$\delta_{-1}(x_0) = \frac{-x_0}{4.457} - \frac{1}{2*4.457} + \log(0.44444)$$
 and the discriminant functions for the QDA model are
 $$\delta_1(x_0) = -\log(2.302) - \frac{(x_0 - 2.6)^2}{2*5.3} + \log(0.55556)$$
-$$\delta_{-1}(x_0) = -\log(1.826) - \frac{(x_0 + 1)^2}{2*5.3} + \log(0.44444)$$
+$$\delta_{-1}(x_0) = -\log(1.826) - \frac{(x_0 + 1)^2}{2*3.3333} + \log(0.44444)$$
 
 ```{r}
 # Make predictions on training data
@@ -205,7 +205,7 @@ grid.arrange(p1, p2, ncol = 2)
 
 These bar charts are shown to look at the categorical data, and how it may be correlated with the variable mpg01.  It shows that the number of cylinders appears to be a very significant factor that could help predict mpg01.  However, we note that in LDA and QDA, we cannot use categorical predictors, as they assume a multivariate normal distribution for the predictors.
 
-Acceleration does not really show strong signs of correlation, but acceleration shows some signs that it may be an insightful predictor, as well as the weight.  Large weights seem to indicate 0 values for mpg01, and lower displacement appears to indicate 1 values for mpg01 (though we note this relationship is not quite as strong, since there are a considerable amount of 0 values with lower than average displacement values).
+Acceleration does not really show strong signs of correlation, but displacement shows some signs that it may be an insightful predictor, as well as the weight.  Large weights seem to indicate 0 values for mpg01, and lower displacement appears to indicate 1 values for mpg01 (though we note this relationship is not quite as strong, since there are a considerable amount of 0 values with lower than average displacement values).
 
 Horsepower also seems to be a significant factor, with higher horsepowers indicating 0 values for mpg01.
 
@@ -241,18 +241,16 @@ autoDAFunction <- function(family, Train, Test, fmla, y) {
   }
   else return("Error, invalid family!")
   preds <- predict(model1, newdata = Test)$class
-  print(preds)
-  cat("\n")
   Confus <- confusionMatrix(data = preds, reference = Test[,y])
   print(Confus$table)
   cat("\n")
   
   Mets = Confus$overall
-  print(Mets)
   Acc = Mets["Accuracy"]
   Err = 1 - Acc
   names(Err) = "Test Error"
   print(Err)
+  cat("\n")
   return(list(model1, preds, Confus, Err))
   #print(ggplot(Test, aes(y = y, x = x, fill = preds)) + geom_tile() + geom_point())
 }
@@ -268,7 +266,6 @@ test_pred = factor( (predict(log_mod, newdata=testAuto, type="response") > .5) *
 test_err = mean(test_pred != testAuto$mpg01)
 test_err
 
-
 ```
 
 ```{r}
@@ -276,18 +273,13 @@ test_err
 library(class)
 testErrs <- rep(0, 19)
 for (kVal in 2:20) {
-  #print(kVal)
   pred = knn(train = trainAuto[,c("weight", "displacement", "horsepower")], test = testAuto[,c("weight", "displacement", "horsepower")], cl=trainAuto[,"mpg01"], k=kVal)
-  #head(pred)
   cmtx = confusionMatrix(data=pred,reference=testAuto[,"mpg01"])
-  #print(cmtx$table)
   mets = cmtx$overall
   acc = mets["Accuracy"]
   err = 1-acc
   names(err) = "Test Error"
-  #print(err)
   testErrs[kVal-1] <- err
-  #cat("\n\n")
 
 }
 TestErrData <- data.frame(KValues = 2:20, TestError = testErrs)
@@ -295,6 +287,6 @@ print(TestErrData)
 print(TestErrData[which(TestErrData$TestError == min(TestErrData$TestError)),])
 ggplot(TestErrData, aes(x = KValues, y = TestError)) + geom_line() +
   scale_y_continuous(limits = c(0, 0.2)) + labs(title = "Test Error vs K Values", x= "K Values", y = "Test Error") + scale_x_continuous(limits = c(2, 20))
-# Create a plot:  x axis -> K value, y axis -> test error
 ```
 
+Thus, a K value of 5 seems to have the best performance with a test error of 0.12658.
